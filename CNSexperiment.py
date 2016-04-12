@@ -39,8 +39,20 @@ class CNSexperiment:
     detectorMass 	= 1 * 1e3 	# [g]
     nNuclei 		= nAvogadro * (detectorMass/molarMass)
 
-    def __init__(self):
+    def __init__(self, dRdEnu_signal, dRdT_background):
+        '''
+        Parameters
+        ----------
+        dRdEnu_signal : function
+            Differential energy spectrum for signal neutrinos (e.g. reactor
+            neutrino spectrum), **per neutrino energy**
+        dRdT_background : function
+            Differential energy spectrum for background, **per recoil energy**
 
+        Returns
+        -------
+        None
+        '''
 
     def dRdT_CNS(self, T):
         '''
@@ -96,21 +108,6 @@ class CNSexperiment:
         '''
 
 
-    def dFdEnu_reactor(self, Enu):
-        '''
-        Differential neutrino flux from a nuclear reactor.
-
-        Parameters
-        ----------
-        Enu : float
-            Neutrino energy
-
-        Returns
-        -------
-        dFdEnu : float
-        '''
-
-
     def run_toy(self):
         '''
         Generates a pseudoexperiment by toy MC.
@@ -138,3 +135,4 @@ class CNSexperiment:
         -------
         q0 : float
             Test statistic for upper limit
+        '''
