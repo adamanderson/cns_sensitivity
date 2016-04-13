@@ -10,36 +10,38 @@
 # Note: Convention on units:
 #   --all masses are in kg
 #   --all energies are in keV
+#   --all distances are in cm
 
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as sps
+import scipy.integrate as spint
 import pdb
+import ReactorTools
 
 # fundamental constants
 hbarc 			= 0.197		# [GeV fm]
 fmPercm			= 1.0e13	# [fm / cm]
+keVPerGeV       = 1e6      # [keV / GeV]
+keVPerMeV       = 1e3
 sin2thetaW		= 0.2387
 cLight			= 3.0e8 	# [m / s]
 nAvogadro		= 6.022e23
 joulePereV		= 1.602e-19	# [J / eV]
 eVPerFission	= 200.0e6 	# [eV]
-massMuon		= 105.658   # [MeV]
+Mn              = 0.931 * keVPerGeV
+Gfermi			= (1.16637e-5)*hbarc/fmPercm		# [cm / GeV]
+
 
 class CNSexperiment:
-    # particle parameters
-    nNeutrons 		= 40.
-    nProtons 		= 32.
-    molarMass 		= 78.	# [g / mol]
-    isotopeMassc2	= molarMass * 0.9314941 		# [GeV]
-    Qw				= nNeutrons - (1.0 - 4.0*sin2thetaW) * nProtons
-    Gfermi			= (1.16637e-5)*hbarc/fmPercm		# [cm / GeV]
+    # # particle parameters
+    # molarMass 		= 78.	# [g / mol]
+    #
+    # # detector parameters
+    # detectorMass 	= 1.0 	# [kg]
+    # nNuclei 		= nAvogadro * (detectorMass/molarMass)
 
-    # detector parameters
-    detectorMass 	= 1 * 1e3 	# [g]
-    nNuclei 		= nAvogadro * (detectorMass/molarMass)
-
-    def __init__(self, dRdEnu_signal, dRdT_background):
+    def __init__(self, N, Z, dRdEnu, dRdT_b):
         '''
         Parameters
         ----------
@@ -53,26 +55,58 @@ class CNSexperiment:
         -------
         None
         '''
+        self.nNeutrons 		    = N
+        self.nProtons 		    = Z
+        self.nNucleons          = N + Z
+        self.isotopeMassc2	    = self.nNucleons * Mn 		# [GeV]
+        self.dRdEnu_source      = dRdEnu
+        self.dRdT_background    = dRdT_b
+        self.Qweak				= self.nNeutrons - (1.0 - 4.0*sin2thetaW) * self.nProtons
 
-    def dRdT_CNS(self, T):
+
+    def dsigmadT_atEnu_CNS(self, Enu, T):
         '''
-        Differential spectrum as a function of energy for CNS.
 
         Parameters
         ----------
-        T : float
-            Energy in keV at which to evaluate the spectrum
+
 
         Returns
         -------
         dRdE : float
             Differential rate at given energy
         '''
-        diffCS = np.zeros((len(T), len(Enu)))
-    	for jEnu in range(len(Enu)):
-    		if np.sum(T < Enu[jEnu]) > 0 and Enu[jEnu]>0:
-    			diffCS[T < Enu[jEnu], jEnu] = (2.495e-25) * (kappa**2) * (1.0/T[T < Enu[jEnu]] - 1.0/Enu[jEnu])
-    	return diffCS
+        dsigmadT = Gfermi**2. / (4*np.pi) * self.Qweak**2. * self.isotopeMassc2 * \
+                    (1. - (self.isotopeMassc2 * T) / (2.*Enu**2.)) * self.F_Helm(T, self.nNucleons)
+        return dsigmadT
+
+
+    def dsigmadT_CNS(self, T):
+        '''
+        docs
+        '''
+        def dsigmadTdEnu_CNS(Enu, T):
+            dsigmadTdEnu = self.dsigmadT_atEnu_CNS(Enu, T) * self.dRdEnu_source(Enu)
+            return dsigmadTdEnu
+
+        dsigmadT = spint.quad(dsigmadTdEnu_CNS, 0, 1.e6, args=(T))
+        return dsigmadT
+
+
+    def F_Helm(self, T, A):
+        # define the momentum transfer in MeV / c
+        q = np.sqrt(2 * (A * Mn) * (T / keVPerMeV))
+
+        # Standard Helm form factor
+        R = 0.89*A**(1.0/3.0) + 0.3   # nuclear radius [fm]
+        a = 0.52                      # [fm]
+        s = 0.9                       # smearing parameter [fm]
+        c = 1.23 * A**(1.0/3.0) - 0.6 # [fm]
+        rn = np.sqrt(c**2.0 + (7.0/3.0)*(np.pi*a)**2 - 5*s**2)   # [fm]
+        F = (3 / ((q * rn / hbarc)**3) * (np.sin(q * rn / hbarc) - (q * rn / hbarc) * np.cos(q * rn / hbarc)))**2.0 * \
+            np.exp(-1.0 * (q*s / hbarc)**2)
+
+        return F
 
 
     def dEdT_background(self, T):
