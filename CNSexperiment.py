@@ -35,7 +35,7 @@ Gfermi			= (1.16637e-5 / (keVPerGeV**2.))*(hbarc/fmPercm)		# [cm / keV]
 
 
 class CNSexperiment:
-    def __init__(self, N, Z, dRdEnu, dRdT_b, detMass, time, nuFlux):
+    def __init__(self, N, Z, dRdEnu, T_bg, dRdT_bg, detMass, time, nuFlux):
         '''
         Parameters
         ----------
@@ -54,12 +54,23 @@ class CNSexperiment:
         self.nNucleons          = N + Z
         self.isotopeMassc2	    = self.nNucleons * Mn 		# [keV]
         self.dRdEnu_source      = dRdEnu
-        self.dRdT_background    = dRdT_b
+        self.T_background       = T_bg
+        self.dRdT_background    = dRdT_bg
         self.Qweak				= self.nNeutrons - (1.0 - 4.0*sin2thetaW) * self.nProtons
         self.detectorMass       = detMass
         self.nTargetAtoms       = self.detectorMass * gPerkg / self.nNucleons * nAvogadro # approximately
         self.livetime           = time
         self.nuFlux             = nuFlux
+
+        # evaluate the cdf at test points and invert by linear interpolation
+        self.T_for_cdf = np.insert(np.logspace(-3,3,100), 0, 1e-8)
+        # total_rate = spint.quad(self.dRdT_CNS, 0., self.T_for_cdf[-1])[0]
+        self.dRdT_samples = self.dRdT_CNS(self.T_for_cdf)
+        self.cumul_rate = np.array([spint.trapz(self.dRdT_samples[:jT], self.T_for_cdf[:jT]) for jT in np.arange(1,len(self.T_for_cdf))])
+        self.total_rate = self.cumul_rate[-1]
+        self.cdf = self.cumul_rate / self.total_rate
+        print self.cdf
+        # self.cdf = np.array([spint.quad(self.dRdT_CNS, 0., T)[0] / self.total_rate for T in self.T_for_cdf])
 
 
     def dsigmadT_atEnu_CNS(self, Enu, T):
@@ -74,14 +85,12 @@ class CNSexperiment:
         dRdE : float
             Differential rate at given energy
         '''
+        # ensure that Enu is always a numpy array, even if input type is float or python list
         if type(Enu) == float:
     		Enu = np.asarray([Enu])
     	else:
     		Enu = np.asarray(Enu)
-        if type(Enu) == float:
-    		Enu = np.asarray([Enu])
-    	else:
-    		Enu = np.asarray(Enu)
+
         dsigmadT = Gfermi**2. / (4*np.pi) * self.Qweak**2. * self.isotopeMassc2 * \
                     (1. - (self.isotopeMassc2 * T) / (2.*Enu**2.)) * self.F_Helm(T, self.nNucleons)
         dsigmadT[dsigmadT<0] = 0.
@@ -92,12 +101,16 @@ class CNSexperiment:
         '''
         docs
         '''
+        # ensure that T is always a numpy array, even if input type is float or python list
+        if type(T) == float:
+    		T = np.asarray([T])
+    	else:
+    		T = np.asarray(T)
         def dsigmadTdEnu_CNS(Enu, T):
             dsigmadTdEnu = 1.e42 * self.dsigmadT_atEnu_CNS(Enu, T) * self.dRdEnu_source(Enu)
-            # print 'dsigmadT = %f' % self.dsigmadT_atEnu_CNS(Enu, T)
-            # print 'nu spectrum = %f' % self.dRdEnu_source(Enu)
             return dsigmadTdEnu
 
+        # pdb.set_trace()
         dsigmadT = np.array([spint.quad(dsigmadTdEnu_CNS, 0, 1.e6, args=(Tval), epsabs=1.e-6)[0]/1.e42 for Tval in T])
         return dsigmadT
 
@@ -105,6 +118,20 @@ class CNSexperiment:
     def dRdT_CNS(self, T):
         dRdT = self.dsigmadT_CNS(T) * self.nuFlux * self.livetime * self.nTargetAtoms
         return dRdT
+
+
+    def dRdT_CNS_fast(self, T):
+        '''
+        Faster version, based on lookup table to avoid slow integrals.
+        '''
+        dRdT = np.interp(T, self.T_for_cdf, self.dRdT_samples)
+        return dRdT
+
+
+    def dRdT_bg(self, T):
+        dRdT = np.interp(T, self.T_background, self.dRdT_background)
+        return dRdT
+
 
     def F_Helm(self, T, A):
         # define the momentum transfer in MeV / c
@@ -138,7 +165,7 @@ class CNSexperiment:
         '''
 
 
-    def neg2logL(self, mu):
+    def neg2logL(self, mu, MCdata):
         '''
         The -2logL as a function of a signal strength parameter mu. The
         parameter mu is defined such that mu=1 corresponds to the nominal cross
@@ -153,6 +180,14 @@ class CNSexperiment:
         -------
         n2LogL : float
         '''
+        bg_rate = 0.
+        sig_rate = mu*self.total_rate
+
+        n2LogL = 2.*(bg_rate + sig_rate) - \
+                 2.*np.sum(np.log(sig_rate * self.dRdT_CNS_fast(MCdata) + \
+                                  bg_rate * self.dRdT_bg(MCdata)))
+
+        return n2LogL
 
 
     def run_toy(self):
@@ -167,6 +202,15 @@ class CNSexperiment:
         -------
         None
         '''
+        print self.total_rate
+        nEvt = np.random.poisson(lam=self.total_rate)
+        unirand = np.random.random(nEvt)
+
+        # evaluate inverse of cdf by linear interpolation
+        T = np.interp(unirand, self.cdf, self.T_for_cdf[:-1])
+
+        return T
+
 
 
     def UL_test_stat(self, data):

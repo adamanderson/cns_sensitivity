@@ -11,7 +11,6 @@
 #   --all energies are in keV
 
 import numpy as np
-import pdb
 
 def dRdEnu_U235(Enu):
 	'''
