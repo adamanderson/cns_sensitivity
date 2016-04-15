@@ -81,3 +81,24 @@ def dRdEnu_Pu239(Enu):
 	spectrum[EnuMeV<1.0] = 1e-3 * np.exp(6.413 - 7.432*1.0 + 3.535*1.0**2.0 - \
 						(8.82e-1)*1.0**3.0 + (1.025e-1)*1.0**4.0 - (4.550e-3)*1.0**5.0)
 	return spectrum
+
+
+def nuFlux(power, distance):
+	'''
+	Computes the total flux of reactor antineutrinos at a given distance from
+	the core, assuming a point-like flux, and nominal neutrino production
+
+	Parameters
+	----------
+	power : float
+		Reactor power in MW
+	distance : float
+		Distance in cm from reactor core at which flux is to be calculated
+
+	Returns
+	-------
+	flux : float
+		The reactor neutrino flux
+	'''
+	flux = power/200.0/1.602176565e-19 / (4*np.pi * distance**2.)
+	return flux

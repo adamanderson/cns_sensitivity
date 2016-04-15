@@ -22,6 +22,7 @@ import ReactorTools
 # fundamental constants
 keVPerGeV       = 1e6      # [keV / GeV]
 keVPerMeV       = 1e3
+gPerkg          = 1e3
 hbarc 			= 0.197*keVPerGeV		# [keV fm]
 fmPercm			= 1.0e13	# [fm / cm]
 sin2thetaW		= 0.2387
@@ -34,14 +35,7 @@ Gfermi			= (1.16637e-5 / (keVPerGeV**2.))*(hbarc/fmPercm)		# [cm / keV]
 
 
 class CNSexperiment:
-    # # particle parameters
-    # molarMass 		= 78.	# [g / mol]
-    #
-    # # detector parameters
-    # detectorMass 	= 1.0 	# [kg]
-    # nNuclei 		= nAvogadro * (detectorMass/molarMass)
-
-    def __init__(self, N, Z, dRdEnu, dRdT_b):
+    def __init__(self, N, Z, dRdEnu, dRdT_b, detMass, time, nuFlux):
         '''
         Parameters
         ----------
@@ -62,6 +56,10 @@ class CNSexperiment:
         self.dRdEnu_source      = dRdEnu
         self.dRdT_background    = dRdT_b
         self.Qweak				= self.nNeutrons - (1.0 - 4.0*sin2thetaW) * self.nProtons
+        self.detectorMass       = detMass
+        self.nTargetAtoms       = self.detectorMass * gPerkg / self.nNucleons * nAvogadro # approximately
+        self.livetime           = time
+        self.nuFlux             = nuFlux
 
 
     def dsigmadT_atEnu_CNS(self, Enu, T):
@@ -103,6 +101,10 @@ class CNSexperiment:
         dsigmadT = np.array([spint.quad(dsigmadTdEnu_CNS, 0, 1.e6, args=(Tval), epsabs=1.e-6)[0]/1.e42 for Tval in T])
         return dsigmadT
 
+
+    def dRdT_CNS(self, T):
+        dRdT = self.dsigmadT_CNS(T) * self.nuFlux * self.livetime * self.nTargetAtoms
+        return dRdT
 
     def F_Helm(self, T, A):
         # define the momentum transfer in MeV / c
