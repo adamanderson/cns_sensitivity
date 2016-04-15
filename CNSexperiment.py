@@ -20,17 +20,18 @@ import pdb
 import ReactorTools
 
 # fundamental constants
-hbarc 			= 0.197		# [GeV fm]
-fmPercm			= 1.0e13	# [fm / cm]
 keVPerGeV       = 1e6      # [keV / GeV]
 keVPerMeV       = 1e3
+hbarc 			= 0.197*keVPerGeV		# [keV fm]
+fmPercm			= 1.0e13	# [fm / cm]
 sin2thetaW		= 0.2387
 cLight			= 3.0e8 	# [m / s]
 nAvogadro		= 6.022e23
 joulePereV		= 1.602e-19	# [J / eV]
 eVPerFission	= 200.0e6 	# [eV]
 Mn              = 0.931 * keVPerGeV
-Gfermi			= (1.16637e-5)*hbarc/fmPercm		# [cm / GeV]
+Gfermi			= (1.16637e-5 / (keVPerGeV**2.))*(hbarc/fmPercm)		# [cm / keV]
+print Gfermi
 
 
 class CNSexperiment:
@@ -58,7 +59,7 @@ class CNSexperiment:
         self.nNeutrons 		    = N
         self.nProtons 		    = Z
         self.nNucleons          = N + Z
-        self.isotopeMassc2	    = self.nNucleons * Mn 		# [GeV]
+        self.isotopeMassc2	    = self.nNucleons * Mn 		# [keV]
         self.dRdEnu_source      = dRdEnu
         self.dRdT_background    = dRdT_b
         self.Qweak				= self.nNeutrons - (1.0 - 4.0*sin2thetaW) * self.nProtons
@@ -95,7 +96,7 @@ class CNSexperiment:
 
     def F_Helm(self, T, A):
         # define the momentum transfer in MeV / c
-        q = np.sqrt(2 * (A * Mn) * (T / keVPerMeV))
+        q = np.sqrt(2 * A * Mn * T)
 
         # Standard Helm form factor
         R = 0.89*A**(1.0/3.0) + 0.3   # nuclear radius [fm]
