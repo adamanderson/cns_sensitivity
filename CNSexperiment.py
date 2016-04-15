@@ -31,7 +31,6 @@ joulePereV		= 1.602e-19	# [J / eV]
 eVPerFission	= 200.0e6 	# [eV]
 Mn              = 0.931 * keVPerGeV
 Gfermi			= (1.16637e-5 / (keVPerGeV**2.))*(hbarc/fmPercm)		# [cm / keV]
-print Gfermi
 
 
 class CNSexperiment:
@@ -77,8 +76,17 @@ class CNSexperiment:
         dRdE : float
             Differential rate at given energy
         '''
+        if type(Enu) == float:
+    		Enu = np.asarray([Enu])
+    	else:
+    		Enu = np.asarray(Enu)
+        if type(Enu) == float:
+    		Enu = np.asarray([Enu])
+    	else:
+    		Enu = np.asarray(Enu)
         dsigmadT = Gfermi**2. / (4*np.pi) * self.Qweak**2. * self.isotopeMassc2 * \
                     (1. - (self.isotopeMassc2 * T) / (2.*Enu**2.)) * self.F_Helm(T, self.nNucleons)
+        dsigmadT[dsigmadT<0] = 0.
         return dsigmadT
 
 
@@ -87,10 +95,12 @@ class CNSexperiment:
         docs
         '''
         def dsigmadTdEnu_CNS(Enu, T):
-            dsigmadTdEnu = self.dsigmadT_atEnu_CNS(Enu, T) * self.dRdEnu_source(Enu)
+            dsigmadTdEnu = 1.e42 * self.dsigmadT_atEnu_CNS(Enu, T) * self.dRdEnu_source(Enu)
+            # print 'dsigmadT = %f' % self.dsigmadT_atEnu_CNS(Enu, T)
+            # print 'nu spectrum = %f' % self.dRdEnu_source(Enu)
             return dsigmadTdEnu
 
-        dsigmadT = spint.quad(dsigmadTdEnu_CNS, 0, 1.e6, args=(T))
+        dsigmadT = np.array([spint.quad(dsigmadTdEnu_CNS, 0, 1.e6, args=(Tval), epsabs=1.e-6)[0]/1.e42 for Tval in T])
         return dsigmadT
 
 

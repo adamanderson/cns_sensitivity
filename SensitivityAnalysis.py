@@ -7,9 +7,10 @@ import numpy as np
 def bkg(T): return 0
 myExpt = CNSexperiment.CNSexperiment(N=14, Z=14, dRdEnu=ReactorTools.dRdEnu_U235, dRdT_b=bkg)
 
-T = np.linspace(1e-6, 0.1, 100)
+T = np.linspace(1e-6, 1.0, 100)
 Thigh = np.linspace(1e-6, 100, 100)
 dsigmadT_1MeV = myExpt.dsigmadT_atEnu_CNS(1000., T)
+dsigmadT_U235 = myExpt.dsigmadT_CNS(T)
 
 # plots
 Enu = np.linspace(0, 1e4, 100)
@@ -21,11 +22,15 @@ plt.legend()
 plt.xlabel('energy [keV]')
 plt.ylabel('nu / keV / fission')
 
-print T
-print dsigmadT_1MeV
 plt.figure()
-plt.semilogy(T, dsigmadT_1MeV)
+plt.plot(T, dsigmadT_1MeV)
 plt.xlabel('recoil energy [keV]')
+plt.ylabel('')
+
+plt.figure()
+plt.semilogy(T, dsigmadT_U235)
+plt.xlabel('recoil energy [keV]')
+plt.title('spectrum from U235 reactor neutrinos')
 plt.ylabel('')
 
 plt.figure()

@@ -11,6 +11,7 @@
 #   --all energies are in keV
 
 import numpy as np
+import pdb
 
 def dRdEnu_U235(Enu):
 	'''
@@ -26,6 +27,10 @@ def dRdEnu_U235(Enu):
 	spectrum : array
 		Spectrum [nu / MeV / fission]
 	'''
+	if type(Enu) == float:
+		Enu = np.asarray([Enu])
+	else:
+		Enu = np.asarray(Enu)
 	EnuMeV = Enu / 1.e3
 	spectrum = 1e-3 * np.exp(3.217 - 3.111*EnuMeV + 1.395*(EnuMeV**2.0) - \
 					  (3.690e-1)*(EnuMeV**3.0) + (4.445e-2)*(EnuMeV**4.0) - (2.053e-3)*(EnuMeV**5.0))
