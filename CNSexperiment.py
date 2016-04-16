@@ -37,13 +37,32 @@ Gfermi			= (1.16637e-5 / (keVPerGeV**2.))*(hbarc/fmPercm)		# [cm / keV]
 class CNSexperiment:
     def __init__(self, N, Z, dRdEnu, T_bg, dRdT_bg, detMass, time, nuFlux):
         '''
+        Constructor for CNSexperiment object, which handles rate calculations,
+        toy MC, and fitting.
+
         Parameters
         ----------
-        dRdEnu_signal : function
-            Differential energy spectrum for signal neutrinos (e.g. reactor
-            neutrino spectrum), **per neutrino energy**
-        dRdT_background : function
-            Differential energy spectrum for background, **per recoil energy**
+        N : float
+            Number of neutrons
+        Z : float
+            Number of protons
+        dRdEnu : func
+            Differential neutrino spectrum per fission, as a function of
+            neutrino energy
+        T_bg : array
+            Recoil energies corresponding to rates in dRdT_bg; background rates
+            are interpolated from sampled points, and this is energy of each
+            sample
+        dRdT_bg : function
+            Differential background rate per recoil energy, as a function of
+            recoil energy; background rates are interpolated from these sampled
+            points
+        detMass : float
+            Detector mass in kg
+        time : float
+            Live time in seconds
+        nuFlux : float
+            Total neutrino flux at the detector in nu / cm^2 / s
 
         Returns
         -------
@@ -64,26 +83,28 @@ class CNSexperiment:
 
         # evaluate the cdf at test points and invert by linear interpolation
         self.T_for_cdf = np.insert(np.logspace(-3,3,100), 0, 1e-8)
-        # total_rate = spint.quad(self.dRdT_CNS, 0., self.T_for_cdf[-1])[0]
         self.dRdT_samples = self.dRdT_CNS(self.T_for_cdf)
         self.cumul_rate = np.array([spint.trapz(self.dRdT_samples[:jT], self.T_for_cdf[:jT]) for jT in np.arange(1,len(self.T_for_cdf))])
         self.total_rate = self.cumul_rate[-1]
         self.cdf = self.cumul_rate / self.total_rate
-        print self.cdf
-        # self.cdf = np.array([spint.quad(self.dRdT_CNS, 0., T)[0] / self.total_rate for T in self.T_for_cdf])
 
 
     def dsigmadT_atEnu_CNS(self, Enu, T):
         '''
+        Differential cross section per recoil energy as a function of recoil
+        energy at a **fixed** neutrino energy (monoenergetic neutrinos) for CNS.
 
         Parameters
         ----------
-
+        Enu : float or array
+            Neutrino energy
+        T : float
+            Recoil energy
 
         Returns
         -------
-        dRdE : float
-            Differential rate at given energy
+        dsigmadT : array
+            Differential cross section
         '''
         # ensure that Enu is always a numpy array, even if input type is float or python list
         if type(Enu) == float:
@@ -99,7 +120,20 @@ class CNSexperiment:
 
     def dsigmadT_CNS(self, T):
         '''
-        docs
+        Differential cross section, integrated over the energy spectrum of
+        incident neutrinos. Note that scipy's numerical integrator "quad" is
+        quite slow, so this function does not evaluate quickly (not good for
+        use in optimization algorithms).
+
+        Parameters
+        ----------
+        T : float or array
+            Recoil energy
+
+        Returns
+        -------
+        dsigmadT : array
+            Differential cross section
         '''
         # ensure that T is always a numpy array, even if input type is float or python list
         if type(T) == float:
@@ -116,24 +150,78 @@ class CNSexperiment:
 
 
     def dRdT_CNS(self, T):
+        '''
+        Differential rate per recoil energy. This calls functions that use scipy
+        "quad", which is slow (see alternative "dRdT_CNS_fast" below).
+
+        Parameters
+        ----------
+        T : float or array
+            Recoil energy
+
+        Returns
+        -------
+        dRdT : array
+            Differential rate
+        '''
         dRdT = self.dsigmadT_CNS(T) * self.nuFlux * self.livetime * self.nTargetAtoms
         return dRdT
 
 
     def dRdT_CNS_fast(self, T):
         '''
-        Faster version, based on lookup table to avoid slow integrals.
+        Differential rate per recoil energy from interpolating function. We
+        evaluate dRdT by interpolating the more accurate version above.
+        Interpolation is only valid between 1e-8 keV and 100 keV.
+
+        Parameters
+        ----------
+        T : float or array
+            Recoil energy
+
+        Returns
+        -------
+        dRdT : array
+            Differential rate
         '''
         dRdT = np.interp(T, self.T_for_cdf, self.dRdT_samples)
         return dRdT
 
 
     def dRdT_bg(self, T):
+        '''
+        Differential background rate.
+
+        Parameters
+        ----------
+        T : float or array
+            Recoil energy
+
+        Returns
+        -------
+        dRdT : array
+            Differential rate
+        '''
         dRdT = np.interp(T, self.T_background, self.dRdT_background)
         return dRdT
 
 
     def F_Helm(self, T, A):
+        '''
+        Helm form factor (same as Lewin and Smith DM paper).
+
+        Parameters
+        ----------
+        T : float or array
+            Recoil energy
+        A : float
+            Number of nucleons
+
+        Returns
+        -------
+        F : float or array
+            Form factor
+        '''
         # define the momentum transfer in MeV / c
         q = np.sqrt(2 * A * Mn * T)
 
@@ -147,22 +235,6 @@ class CNSexperiment:
             np.exp(-1.0 * (q*s / hbarc)**2)
 
         return F
-
-
-    def dEdT_background(self, T):
-        '''
-        Differential spectrum as a function of energy for CNS.
-
-        Parameters
-        ----------
-        T : float
-            Energy in keV at which to evaluate the spectrum
-
-        Returns
-        -------
-        dRdE : float
-            Differential rate at given energy
-        '''
 
 
     def neg2logL(self, mu, MCdata):
@@ -200,9 +272,10 @@ class CNSexperiment:
 
         Returns
         -------
-        None
+        T : array
+            Recoil energy of MC samples
         '''
-        print self.total_rate
+        # use inverse CDF method for random sampling of the energy spectrum
         nEvt = np.random.poisson(lam=self.total_rate)
         unirand = np.random.random(nEvt)
 
@@ -210,20 +283,3 @@ class CNSexperiment:
         T = np.interp(unirand, self.cdf, self.T_for_cdf[:-1])
 
         return T
-
-
-
-    def UL_test_stat(self, data):
-        '''
-        Test statistic for an upper limit.
-
-        Parameters
-        ----------
-        data : array
-            Numpy array with list of event energies
-
-        Returns
-        -------
-        q0 : float
-            Test statistic for upper limit
-        '''

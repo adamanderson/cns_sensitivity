@@ -14,7 +14,8 @@ import numpy as np
 
 def dRdEnu_U235(Enu):
 	'''
-	Reactor anti neutrino spectrum from U235 (see arXiv:1101.2663v3)
+	Reactor anti neutrino spectrum from U235 (see arXiv:1101.2663v3), per
+	fission
 
 	Parameters
 	----------
@@ -40,7 +41,8 @@ def dRdEnu_U235(Enu):
 
 def dRdEnu_U238(Enu):
 	'''
-	Reactor anti neutrino spectrum from U238 (see arXiv:1101.2663v3)
+	Reactor anti neutrino spectrum from U238 (see arXiv:1101.2663v3), per
+	fission
 
 	Parameters
 	----------
@@ -62,7 +64,8 @@ def dRdEnu_U238(Enu):
 
 def dRdEnu_Pu239(Enu):
 	'''
-	Reactor anti neutrino spectrum from Pu239 (see arXiv:1101.2663v3)
+	Reactor anti neutrino spectrum from Pu239 (see arXiv:1101.2663v3), per
+	fission
 
 	Parameters
 	----------
@@ -84,8 +87,8 @@ def dRdEnu_Pu239(Enu):
 
 def nuFlux(power, distance):
 	'''
-	Computes the total flux of reactor antineutrinos at a given distance from
-	the core, assuming a point-like flux, and nominal neutrino production
+	Computes the total flux per fission of reactor antineutrinos at a given
+	distance from the core, assuming a point-like flux, and nominal neutrino production
 
 	Parameters
 	----------

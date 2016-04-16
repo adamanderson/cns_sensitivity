@@ -19,10 +19,6 @@ toydata = myExpt.run_toy()
 
 mu = np.linspace(0.9, 1.1, 20)
 neg2LogL = np.array([myExpt.neg2logL(m, toydata) for m in mu])
-print mu.shape
-print neg2LogL.shape
-
-print myExpt.neg2logL(1.0, toydata)
 
 # plots
 Enu = np.linspace(0, 1e4, 100)
